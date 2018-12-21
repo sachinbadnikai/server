@@ -6,6 +6,7 @@ const _=require('lodash');
 const {User,validate,}=require('../models/users');
 const express=require('express');
 const router=express.Router();
+const passport=require('passport');
 
 
 router.get('/me',async(req,res)=>{
@@ -23,6 +24,12 @@ router.get('/',async(req,res)=>{
    router.post('/reset',users.reset);
    router.post('/reset/:token',users.passwordresetwithtoken);
    router.post('/verify/:secretToken',users.verifyEmail);
+
+
+   router.get('/auth/google/callback',passport.authenticate('google'),
+   function(req, res) {
+     res.send('you reached callback url');
+   });
 
 
 router.get('/:id',async(req,res)=>{
