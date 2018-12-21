@@ -1,63 +1,58 @@
 const crypto = require('crypto');
 const bcrypt=require('bcrypt');
 const _=require('lodash');
-const {User,validate,}=require('../models/users');
+const {User,validate,userSchema}=require('../models/users');
 const nodemailer=require('nodemailer');
 const sendgridtransport=require('nodemailer-sendgrid-transport');
 const config=require('../config/dev');
 const randomstring=require('randomstring');
+const jwt=require('jsonwebtoken');
+
+
 
 const transporter=nodemailer.createTransport(sendgridtransport({
   auth:{
-      api_key:config.SEND_GRID_API
+      api_key:config.sendgrid.api_key
   }
 }));
-exports.register=async(req,res)=>{
+
+//user registration
+exports.register=async(req,res,next)=>{
     const {password,email,confirm}=req.body;
 
     //if invalid 404-bad equest
-    if(!password || !email){
-return res.status(422).send({error:[{title:'data is missing', details:'provide email and password'}]});
-    }
+    if(!password || !email) return res.status(422).send({error:[{title:'data is missing', details:'provide email and password'}]});
     
-    if(password !==confirm){
-     return res.status(422).send({errors:[{title:'invalid password', details:'password is not same as a confirmation'}]});
-            }
+    if(password !==confirm) return res.status(422).send({errors:[{title:'invalid password', details:'password is not same as a confirmation'}]});
+            
     const {error}=validate(req.body);//object destructuring
     if(error) return res.status(400).send(error.details[0].message);
 
     let user=await User.findOne({email})
     if(user) return res.status(400).send("user is already registered");
 
-    // if(user.isCustomer===user.isVender) return res.status(400).send("user is register");
-    // // if(user.isVender===true) return res.status(400).send("user is register");
     user=new User({
          name:req.body.name,
         lastName:req.body.lastName,
         email:req.body.email,
         password:req.body.password,
-        confirm:req.body.confirm,
+        // confirm:req.body.confirm,
         phoneno:req.body.phoneno,
         memberSince:req.body.memberSince,
         id:req.body.id,    
 });
-    // _.pick(req.body,['name','LastName','email','password','Phoneno','confirm','isAdmin','Term'])
 
-    const salt=await bcrypt.genSalt(10);
+         const salt=await bcrypt.genSalt(10);
     
          user.password= await bcrypt.hash(user.password,salt);
-         user.confirm= await bcrypt.hash(user.confirm,salt);
+        //  user.confirm= await bcrypt.hash(user.confirm,salt);
         
          //generate the secret token
         const secretToken=randomstring.generate();
         // const active=false;
          user.secretToken=secretToken;
-         //flag the account inactive
-        //  user.active-active;
-
 
          await transporter.sendMail({
-    
           to:req.body.email,
           from:'sachinbadnikai530@gmail.com',
           subject:'verify your email address',
@@ -66,21 +61,24 @@ return res.status(422).send({error:[{title:'data is missing', details:'provide e
         <p>Click this link to verify your email<a href="http://localhost:3000/api/verify/${secretToken}">link</a></p>`
       });
     
-         
-    await user.save();
-    
-    const token=user.generateAuthToken();
-    // const token=jwt.sign({_id:user._id},'jwtPrivateKey');
-    //  res.header('x-auth-token',token).send(_.pick(user,['name','email']));
-    res.header('Authorization',token).send({token});;
+         next();
+    await user.save().then().catch(err => {
+      const error = new Error(err);
+      error.httpStatusCode = 500;
+      return next(error);
+      res.end();
+    });
+
+    //const token=user.generateAuthToken();
+    const token=jwt.sign({_id:user._id,isAdmin:user.isAdmin},config.SECRET);
+    res.header('Authorization',token);
      res.status(200).send({token});
-     res.send('email is sent');
    
      console.log(user.email);
    
 }
 
-
+//forgot password with email address
 exports.forgot = (req, res, next) => {
     crypto.randomBytes(32, (err, buffer) => {
       if (err) {
@@ -97,11 +95,14 @@ exports.forgot = (req, res, next) => {
           }
           transporter.sendMail({
             to: req.body.email,
-            from: 'sachinbadnikai143@gmail.com',
+            from: 'sachinbadnikai530@gmail.com',
             subject: 'Password reset',
             html: `
-              <p>You requested a password reset</p>
-              <p>Click this <a href="http://localhost:3000/api/reset/${token}">link</a> to set a new password.</p>
+            'You are receiving this because you have requested the reset of the password for your account.\n\n' +
+            'Please click on the following link\n\n' +
+            'http://localhost:3000/api/reset/${token}' +  '\n\n' +
+            'If you did not request this, please ignore this email and your password will remain unchanged.\n'
+              
             `
           });
           res.send('email is send please check your email');
@@ -109,18 +110,6 @@ exports.forgot = (req, res, next) => {
           user.resetTokenExpiration = Date.now() + 3600000;
           return user.save();
         })
-        // .then(result => {
-        //   res.redirect('/');
-        //   transporter.sendMail({
-        //     to: 'sachinbadnikai530@gmail.com',
-        //     from: 'sachinbadnikai143@gmail.com',
-        //     subject: 'Password reset',
-        //     html: `
-        //       <p>You requested a password reset</p>
-        //       <p>Click this <a href="http://localhost:3000/reset/${token}">link</a> to set a new password.</p>
-        //     `
-        //   });
-        // })
         .catch(err => {
           const error = new Error(err);
           error.httpStatusCode = 500;
@@ -129,7 +118,7 @@ exports.forgot = (req, res, next) => {
     });
   };
 
-
+//password reset without token
  exports.reset= function(req, res) {
     User.findOne(function(err, user,next) {
       if (!user) {
@@ -153,9 +142,12 @@ user.save();
   
 }
 
-
+//password reset with token
 exports.passwordresetwithtoken  = async(req, res, next) => {
     const newPassword = req.body.password;
+    const newConfirm = req.body.confirm;
+
+    if(newPassword !==newConfirm) return res.status(422).send({errors:[{title:'invalid password', details:'password is not same as a confirmation'}]});
     //  const userId = req.body.userId;
     const passwordToken = req.body.passwordToken;
     let resetUser;
@@ -212,3 +204,5 @@ exports.verifyEmail=async (req,res,next)=>{
   }
     
 }
+
+

@@ -1,4 +1,4 @@
-const confi=require('config');
+const config=require('../config/dev');
 const jwt=require('jsonwebtoken');
 const Joi=require('joi');
 const bcrypt=require('bcrypt');
@@ -29,8 +29,8 @@ router.post('/',async(req,res)=>{
      if(!validPassword) return res.status(400).send("user email or password is invalid");
      
      
-     const token=user.generateAuthToken();
-    //  const token=jwt.sign({_id:user._id},confi.get('jwtPrivateKey'));
+     //const token=user.generateAuthToken();
+     const token=jwt.sign({_id:user._id,isAdmin:user.isAdmin},config.SECRET);
      res.send({token});
   
     
