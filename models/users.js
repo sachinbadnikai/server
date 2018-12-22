@@ -8,7 +8,7 @@ const userSchema=new mongoose.Schema(
     {        
          name: {type: String},
          lastName:{type:String},
-         phoneno:{type: String,unique: true},
+         phoneno:{type: String},
          password: String,
         // confirm:String,
          email: {type: String, unique: true},
@@ -20,6 +20,7 @@ const userSchema=new mongoose.Schema(
          isAdmin: {type: Boolean, default: false},
          memberSince : {type : Date, default : Date.now},
          googleid:String,
+         facebookid:String
      });
            userSchema.methods.generateAuthToken=function(){
            const token=jwt.sign({_id:this._id,isAdmin:this.isAdmin},config.SECRET, {
