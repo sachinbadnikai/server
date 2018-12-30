@@ -39,7 +39,7 @@ const express=require('express');
 
 
 
-router.get('/',[auth,admin],async(req,res)=>{
+router.get('/',async(req,res)=>{
     
     const food=await foo.find().sort('name');
     res.send(food);
@@ -50,9 +50,7 @@ router.post('/',upload.single('image'),async(req,res)=>{
     const {error}=validate(req.body);//object destructuring
     //if invalid 404-bad equest
     if(error) return res.status(400).send(error.details[0].message);
-  if(!image){
-return res.status(422).send('only jpg,jpeg,png files are accepted');
-        }
+  if(!image) return res.status(422).send('only jpg,jpeg,png files are accepted'); 
 
         //400 bad request
         let food=new foo({
@@ -69,12 +67,10 @@ router.put('/:id',upload.single('image'),async(req,res)=>{
     const image=req.file;
     const {error}=validate(req.body);//object destructuring
     //400 bad request
-    if(!image){
-        return res.status(422).send('only jpg,jpeg,png files are accepted');
-                }
+    if(!image) return res.status(422).send('only jpg,jpeg,png files are accepted');
+                
 
-    if(error)  return res.status(400).send(error.details[0].message);
-        try{
+    if(error) return res.status(400).send(error.details[0].message);
             //look up the food
             const food=await foo.findByIdAndUpdate(req.params.id,{
                //personal details
@@ -86,39 +82,37 @@ router.put('/:id',upload.single('image'),async(req,res)=>{
                 new:true
             });
             res.send(food);//return updated food 
-           }
-           //if not exists return 404 error
-           catch(ex){
-            res.status(404).send("The given food id was not found"); 
-           }
          });
 
    router.delete('/:id',[auth,admin],async(req,res)=>{
     const {error}=validate(req.body);//object destructuring
         //400 bad request
     if(error)  return res.status(400).send(error.details[0].message);
-    try{
         //look up the food
         const foods=await foo.findByIdAndRemove(req.params.id);
         res.send(foods);//return delete food
-       }
-       //if not exists return 404 error
-    catch(ex){
-        res.status(404).send("The given food id was not found");
-        }
    });
 
    router.get('/:id',async(req,res)=>{
-     try{
          ////look up the food
         const food=await foo.findById(req.params.id);
         res.send(food);
-     }
-     //if not exists return 404 error
-     catch(ex){
-        res.status(404).send("The given food id was not found");
-     }
 });
+
+router.get('/',async(req,res)=>{
+    const name=req.query.name;
+    const query=name?{name}:{};
+
+    foo.find(query)
+    .select(['name'])
+    .exec(function(error,findname){
+        if(error) return res.status(400).send(error.details[0].message);
+    
+        if(name && findname.length ===0) return res.send('given name is not found');
+        return res.json({findname})
+    });
+});
+
 
   
    module.exports=router;

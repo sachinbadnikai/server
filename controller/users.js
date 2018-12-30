@@ -69,8 +69,8 @@ exports.register=async(req,res,next)=>{
       res.end();
     });
 
-    //const token=user.generateAuthToken();
-    const token=jwt.sign({_id:user._id,isAdmin:user.isAdmin},config.SECRET);
+    const token=user.generateAuthToken();
+  //  const token=jwt.sign({_id:user._id,isAdmin:user.isAdmin},config.SECRET);
     res.header('Authorization',token);
      res.status(200).send({token});
    
