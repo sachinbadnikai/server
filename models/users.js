@@ -4,6 +4,8 @@ const Joi=require('joi');
 const mongoose=require('mongoose');
 const config=require('../config/dev');
 
+const Schema=mongoose.Schema;
+
 const userSchema=new mongoose.Schema(
     {        
          name: {type: String},
@@ -20,8 +22,61 @@ const userSchema=new mongoose.Schema(
          isAdmin: {type: Boolean, default: false},
          memberSince : {type : Date, default : Date.now},
          googleid:String,
-         facebookid:String
+         facebookid:String,
+        
+         cart: {
+          items: [
+            {
+              productId: {
+                type: Schema.Types.ObjectId,
+                ref: 'Product',
+                required: true
+              },
+              quantity: { type: Number, required: true }
+            }
+          ]
+        }
+
      });
+
+     userSchema.methods.addToCart =  function(product) {
+       console.log(product);
+      const cartProductIndex = this.cart.items.findIndex(cp => {
+        return cp.productId.toString() === product._id.toString();
+      });
+      let newQuantity = 1;
+      const updatedCartItems = [...this.cart.items];
+    
+      if (cartProductIndex >= 0) {
+        newQuantity = this.cart.items[cartProductIndex].quantity + 1;
+        updatedCartItems[cartProductIndex].quantity = newQuantity;
+      } else {
+        updatedCartItems.push({
+          productId: product._id,
+          quantity: newQuantity
+        });
+      }
+      const updatedCart = {
+        items: updatedCartItems
+      };
+      this.cart = updatedCart;
+      return this.save();
+    };
+
+
+    userSchema.methods.removeFromCart = function(productId) {
+      const updatedCartItems = this.cart.items.filter(item => {
+        return item.productId.toString() !== productId.toString();
+      });
+      this.cart.items = updatedCartItems;
+      return this.save();
+    };
+
+    userSchema.methods.clearCart = function() {
+      this.cart = { items: [] };
+      return this.save();
+    };
+
            userSchema.methods.generateAuthToken=function(){
            const token=jwt.sign({_id:this._id,isAdmin:this.isAdmin},config.SECRET, {
                           expiresIn: 60 * 120
@@ -30,7 +85,7 @@ const userSchema=new mongoose.Schema(
 }
 
    
-const User=mongoose.model('user',userSchema);
+const User=mongoose.model('User',userSchema);
 
    function validateUser(User){
     const schema={
@@ -49,3 +104,4 @@ const User=mongoose.model('user',userSchema);
    module.exports.User=User;
    module.exports.validate=validateUser;
    module.exports.userSchema=userSchema;
+  
